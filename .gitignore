@@ -1,6 +1,8 @@
 /node_modules
 /APIMonitor/node_modules
 /APIMonitor/dist
+/AnalysisService/node_modules
+/AnalysisService/dist
 /APIMonitor/.env
 /APIMonitor/event-log-fallback.jsonl
 .DS_Store
