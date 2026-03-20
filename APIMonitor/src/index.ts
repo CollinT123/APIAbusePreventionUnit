@@ -3,7 +3,11 @@ import { Server } from "http";
 
 import { config } from "./config";
 import { EventEmitter } from "./emitter/eventEmitter";
+import { fixRegistry } from "./fixes/fixRegistry";
+import { removeCache } from "./fixes/strategies/responseCache";
+import { fixInterceptor } from "./middleware/fixInterceptor";
 import { requestTracker } from "./middleware/requestTracker";
+import { EventStore } from "./store/eventStore";
 
 const users = [
   { id: "1", name: "Ada Lovelace", email: "ada@example.com" },
@@ -36,20 +40,101 @@ function getNextChainDepthHeader(currentValue: string | undefined): string {
   return String(parsedDepth + 1);
 }
 
-export function createApp(currentConfig = config): express.Express {
-  const app = express();
-  const emitter = new EventEmitter(
-    currentConfig.EVENT_SINK_URL,
-    currentConfig.EVENT_SINK_TIMEOUT_MS,
-    currentConfig.EVENT_SINK_RETRY_COUNT,
-    currentConfig.LOG_EVENTS_LOCALLY,
-    currentConfig.BATCH_EVENTS,
-    currentConfig.LOCAL_FALLBACK_LOG
-  );
+function getSinkOrigin(currentConfig = config): string {
+  const sinkUrl = new URL(currentConfig.EVENT_SINK_URL);
+  return sinkUrl.origin;
+}
 
-  app.use(express.json());
-  app.use(requestTracker(emitter.emit.bind(emitter)));
+async function fetchAnalyzedEventsFromSink(currentConfig = config) {
+  const response = await fetch(`${getSinkOrigin(currentConfig)}/events/analyzed`);
 
+  if (!response.ok) {
+    throw new Error(`Sink status fetch failed with ${response.status}`);
+  }
+
+  return response.json() as Promise<
+    Array<{
+      event: import("./types/rawApiEvent").RawApiEvent;
+      analysis: import("./types/analyzedApiEvent").AnalyzedApiEvent;
+    }>
+  >;
+}
+
+function addFixRoutes(app: express.Express, currentConfig = config): void {
+  app.post("/fixes", (req, res) => {
+    const {
+      ruleName,
+      route,
+      strategy = "response_cache",
+      params = { ttlMs: 5000 }
+    } = req.body as {
+      ruleName?: string;
+      route?: string;
+      strategy?: string;
+      params?: Record<string, unknown>;
+    };
+
+    if (!ruleName || !route) {
+      res.status(400).json({ error: "ruleName and route are required" });
+      return;
+    }
+
+    const fix = fixRegistry.applyFix(ruleName, route, strategy, params);
+    console.log(`[FIX APPLIED] ${strategy} on ${route} for ${ruleName}`);
+    res.status(201).json(fix);
+  });
+
+  app.get("/fixes", (_req, res) => {
+    res.json(fixRegistry.getAllFixes());
+  });
+
+  app.get("/fixes/:id/status", async (req, res) => {
+    const fix = fixRegistry.getAllFixes().find((entry) => entry.id === req.params.id);
+
+    if (!fix) {
+      res.status(404).json({ error: "Fix not found" });
+      return;
+    }
+
+    try {
+      const analyzedEntries = await fetchAnalyzedEventsFromSink(currentConfig);
+      const tempStore = new EventStore();
+
+      for (const { event, analysis } of analyzedEntries) {
+        tempStore.add(event);
+        tempStore.setAnalysis(event.requestId, analysis);
+      }
+
+      const status = fixRegistry.getFixStatus(req.params.id, tempStore);
+
+      if (!status) {
+        res.status(404).json({ error: "Fix not found" });
+        return;
+      }
+
+      res.json(status);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(502).json({ error: message });
+    }
+  });
+
+  app.delete("/fixes/:id", (req, res) => {
+    const fix = fixRegistry.getAllFixes().find((entry) => entry.id === req.params.id);
+
+    if (!fix) {
+      res.status(404).json({ error: "Fix not found" });
+      return;
+    }
+
+    fixRegistry.removeFix(req.params.id);
+    removeCache(fix.route);
+    console.log(`[FIX REMOVED] ${req.params.id}`);
+    res.json({ removed: true });
+  });
+}
+
+function addDemoRoutes(app: express.Express): void {
   app.get(
     "/api/users",
     withLatency((_req, res) => {
@@ -132,8 +217,33 @@ export function createApp(currentConfig = config): express.Express {
       res.json({ status: "ok" });
     })
   );
+}
+
+function createConfiguredApp(
+  currentConfig = config,
+  emitter = new EventEmitter(
+    currentConfig.EVENT_SINK_URL,
+    currentConfig.EVENT_SINK_TIMEOUT_MS,
+    currentConfig.EVENT_SINK_RETRY_COUNT,
+    currentConfig.LOG_EVENTS_LOCALLY,
+    currentConfig.BATCH_EVENTS,
+    currentConfig.LOCAL_FALLBACK_LOG
+  )
+): express.Express {
+  const app = express();
+
+  app.use(express.json());
+  app.use(requestTracker(emitter.emit.bind(emitter)));
+  app.use(fixInterceptor());
+
+  addFixRoutes(app, currentConfig);
+  addDemoRoutes(app);
 
   return app;
+}
+
+export function createApp(currentConfig = config): express.Express {
+  return createConfiguredApp(currentConfig);
 }
 
 export function startServer(
@@ -149,76 +259,11 @@ export function startServer(
     currentConfig.LOCAL_FALLBACK_LOG
   )
 ): Server {
-  const app = express();
-
-  app.use(express.json());
-  app.use(requestTracker(emitter.emit.bind(emitter)));
-
-  app.get(
-    "/api/users",
-    withLatency((_req, res) => {
-      res.json(users);
-    })
-  );
-
-  app.get(
-    "/api/users/:id",
-    withLatency((req, res) => {
-      const user = users.find((entry) => entry.id === req.params.id);
-
-      if (!user) {
-        res.status(404).json({ error: "User not found" });
-        return;
-      }
-
-      res.json(user);
-    })
-  );
-
-  app.post(
-    "/api/users",
-    withLatency((req, res) => {
-      const createdUser = {
-        id: String(users.length + 1),
-        name: req.body?.name ?? "New User",
-        email: req.body?.email ?? "new.user@example.com"
-      };
-
-      res.status(201).json(createdUser);
-    })
-  );
-
-  app.get(
-    "/api/orders",
-    withLatency((_req, res) => {
-      res.json(orders);
-    })
-  );
-
-  app.get(
-    "/api/orders/:id",
-    withLatency((req, res) => {
-      const order = orders.find((entry) => entry.id === req.params.id);
-
-      if (!order) {
-        res.status(404).json({ error: "Order not found" });
-        return;
-      }
-
-      res.json(order);
-    })
-  );
-
-  app.get(
-    "/api/health",
-    withLatency((_req, res) => {
-      res.json({ status: "ok" });
-    })
-  );
+  const app = createConfiguredApp(currentConfig, emitter);
 
   return app.listen(port, host, () => {
     console.log(
-      `API server listening on port ${port} with event sink ${currentConfig.EVENT_SINK_URL}`
+      `API Server listening on port ${port}, emitting events to ${currentConfig.EVENT_SINK_URL}`
     );
   });
 }

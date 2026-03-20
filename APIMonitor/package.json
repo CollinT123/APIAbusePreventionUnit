@@ -9,12 +9,16 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "simulate": "ts-node scripts/simulate.ts",
+    "demo:reset": "ts-node scripts/demo-reset.ts",
+    "demo:tracking": "ts-node scripts/demo-tracking.ts",
+    "demo:attack": "ts-node scripts/demo-attack.ts",
     "sink": "ts-node mock-sink/index.ts"
   },
   "dependencies": {
     "express": "^5.1.0",
     "node-fetch": "^2.7.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",

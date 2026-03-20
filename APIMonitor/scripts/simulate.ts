@@ -14,10 +14,10 @@ async function sendRequest(
   path: string,
   init: RequestInit = {},
   scenario: string
-): Promise<void> {
+): Promise<Response | null> {
   scenarioCounts[scenario] = (scenarioCounts[scenario] ?? 0) + 1;
 
-  await fetch(`${BASE_URL}${path}`, {
+  return fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -29,7 +29,26 @@ async function sendRequest(
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Request failed for ${path}: ${message}`);
+    return null;
   });
+}
+
+async function fetchJson<T>(path: string, init?: RequestInit): Promise<T | null> {
+  try {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {})
+      }
+    });
+
+    return (await response.json()) as T;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Request failed for ${path}: ${message}`);
+    return null;
+  }
 }
 
 async function runScenario(
@@ -130,6 +149,84 @@ async function mixedBurst(): Promise<void> {
   await Promise.all(requests);
 }
 
+type FlaggedResponse = {
+  issues: Record<string, Array<{ event: unknown; analysis: unknown }>>;
+};
+
+type FixResponse = {
+  id: string;
+  ruleName: string;
+  route: string;
+  strategy: string;
+  params: Record<string, unknown>;
+  appliedAt: string;
+  status: string;
+};
+
+type FixStatusResponse = {
+  eventsBeforeFix: number;
+  eventsSinceFix: number;
+  issuesSinceFix: number;
+  effective: boolean;
+};
+
+async function fixDemoDuplicateRequests(): Promise<void> {
+  const scenario = "Fix Demo";
+
+  console.log("\n=== FIX DEMO: Duplicate Request Resolution ===");
+
+  const firstBurst = Array.from({ length: 5 }, async (_, index) => {
+    await sleep(index * 100);
+    await sendRequest("/api/users/1", { method: "GET" }, scenario);
+  });
+  await Promise.all(firstBurst);
+
+  await sleep(1000);
+
+  const flaggedBefore = await fetchJson<FlaggedResponse>("/flagged");
+  console.log("Flagged issues before fix:");
+  console.log(JSON.stringify(flaggedBefore, null, 2));
+
+  console.log('Applying fix: response_cache on /api/users/:id');
+  const fix = await fetchJson<FixResponse>("/fixes", {
+    method: "POST",
+    body: JSON.stringify({
+      ruleName: "duplicateRequests",
+      route: "/api/users/:id",
+      strategy: "response_cache",
+      params: { ttlMs: 5000 }
+    })
+  });
+
+  if (!fix) {
+    console.log("Fix creation failed; skipping fix demo follow-up.");
+    return;
+  }
+
+  await sleep(500);
+
+  const secondBurst = Array.from({ length: 5 }, async (_, index) => {
+    await sleep(index * 100);
+    await sendRequest("/api/users/1", { method: "GET" }, scenario);
+  });
+  await Promise.all(secondBurst);
+
+  await sleep(500);
+
+  const fixStatus = await fetchJson<FixStatusResponse>(`/fixes/${fix.id}/status`);
+  console.log("Fix status:");
+  console.log(JSON.stringify(fixStatus, null, 2));
+
+  const duplicateIssuesBefore =
+    flaggedBefore?.issues.duplicateRequests?.length ?? 0;
+  const duplicateIssuesAfter = fixStatus?.issuesSinceFix ?? 0;
+  const effective = fixStatus?.effective ? "yes" : "no";
+
+  console.log(
+    `Before fix: ${duplicateIssuesBefore} flagged events. After fix: ${duplicateIssuesAfter} flagged events. Fix effective: ${effective}`
+  );
+}
+
 async function main(): Promise<void> {
   await runScenario("Normal browsing", normalBrowsing);
   await runScenario("Duplicate calls", duplicateCalls);
@@ -137,6 +234,7 @@ async function main(): Promise<void> {
   await runScenario("Polling", polling);
   await runScenario("404 hammering", hammer404);
   await runScenario("Mixed burst", mixedBurst);
+  await fixDemoDuplicateRequests();
 
   const totalRequestsSent = Object.values(scenarioCounts).reduce(
     (sum, count) => sum + count,

@@ -2,7 +2,7 @@ import { AddressInfo } from "net";
 import { Server } from "http";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { startMockSink } from "../mock-sink/index";
+import { startAnalysisSink } from "../mock-sink/index";
 import { startServer } from "../src/index";
 import { ApiEvent } from "../src/types/apiEvent";
 
@@ -44,7 +44,7 @@ afterEach(async () => {
 
 describe("integration pipeline", () => {
   it("emits an event to the mock sink end-to-end", async () => {
-    const sink = startMockSink(0);
+    const sink = startAnalysisSink(0);
     serversToClose.push(sink.server);
     await waitForListening(sink.server);
     const sinkPort = (sink.server.address() as AddressInfo).port;
