@@ -359,8 +359,8 @@ function createAnalysisSinkApp(): express.Express {
     res.json({ routes });
   });
 
-  app.get("/routes/:route", (req, res) => {
-    const route = decodeURIComponent(req.params.route);
+  app.get(/^\/routes\/(.+)$/, (req, res) => {
+    const route = decodeURIComponent(req.params[0]);
     const routeEvents = eventStore
       .getAll()
       .filter((event) => event.route === route)

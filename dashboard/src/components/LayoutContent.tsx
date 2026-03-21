@@ -1,7 +1,7 @@
 "use client";
 
 import { useBackendStatus } from "@/lib/hooks";
-import { NavTabs } from "./NavTabs";
+import { Breadcrumbs } from "./Breadcrumbs";
 import { PageTransition } from "./PageTransition";
 
 export function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -12,7 +12,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
         anyDown ? "pt-24" : "pt-14"
       }`}
     >
-      <NavTabs />
+      <Breadcrumbs />
       <PageTransition>
         <main className="flex-1 p-6">{children}</main>
       </PageTransition>

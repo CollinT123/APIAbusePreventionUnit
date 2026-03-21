@@ -150,21 +150,6 @@ export function useFixStatus(fixId: string): {
 
 const SINK_POLL_MS = 5000;
 
-export function useSinkConnection(): boolean | null {
-  const [connected, setConnected] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const check = async () => {
-      setConnected(await checkSinkConnection());
-    };
-    check();
-    const id = setInterval(check, SINK_POLL_MS);
-    return () => clearInterval(id);
-  }, []);
-
-  return connected;
-}
-
 export function useBackendStatus(): {
   sinkOk: boolean | null;
   apiOk: boolean | null;
@@ -201,6 +186,7 @@ export function useRefreshAll(): () => Promise<void> {
       mutate("summary"),
       mutate("fixes"),
       mutate("events"),
+      mutate("routes"),
     ]);
   };
 }
