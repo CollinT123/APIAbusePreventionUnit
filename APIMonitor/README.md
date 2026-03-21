@@ -19,7 +19,7 @@ There are two distinct services:
   - receives `/events`
   - stores events in memory
   - runs analysis rules
-  - exposes `/flagged`, `/events`, and `/events/summary`
+  - exposes `/flagged`, `/events`, `/events/summary`, and `/routes`
 
 High-level flow:
 
@@ -112,6 +112,7 @@ npm run simulate
 ```bash
 curl http://localhost:4000/events/summary
 curl http://localhost:4000/flagged
+curl http://localhost:4000/routes
 ```
 
 ## Demo Scripts
@@ -194,6 +195,7 @@ npm run demo:attack
 
 - `GET /events/summary` output
 - `GET /flagged` output
+- `GET /routes` output
 - grouped `duplicateRequests`
 
 5. Apply the fix from the frontend by calling:
@@ -324,6 +326,8 @@ The sink in [`mock-sink/index.ts`](/Users/collintucker/Workspace/HackathonSpring
 - `GET /events/analyzed`
 - `GET /events/summary`
 - `GET /flagged`
+- `GET /routes`
+- `GET /routes/:route`
 - `DELETE /events`
 
 Important current behavior:
@@ -335,6 +339,42 @@ Important current behavior:
   - `DELETE /events` is called
 
 That means frontend analytics now persist for the full sink session and will not disappear after 2 minutes.
+
+## Route Analytics Endpoints
+
+The Analysis Sink now exposes route-level aggregation endpoints for dashboard pages and drill-downs:
+
+- `GET /routes`
+  - returns all known routes sorted by `totalRequests` descending
+  - includes:
+    - request counts
+    - last seen timestamp
+    - method list
+    - status breakdown
+    - aggregated issues
+    - active fix for that route
+    - performance metrics such as average, min, max, p50, p95, p99 latency, success rate, and latency trend
+
+- `GET /routes/:route`
+  - accepts a URL-encoded route pattern such as:
+
+```text
+/routes/%2Fapi%2Fusers%2F%3Aid
+```
+
+  - returns:
+    - the same route summary fields as `/routes`
+    - up to 50 most recent raw events for that route
+    - analyzed events for that route
+    - current and past fixes for that route
+    - `performanceOverTime` in 5-second buckets for simple charting
+
+Example:
+
+```bash
+curl http://localhost:4000/routes
+curl http://localhost:4000/routes/%2Fapi%2Fusers%2F%3Aid
+```
 
 ## Event Schema
 
