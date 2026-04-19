@@ -4,8 +4,6 @@ A two-service API observability and mitigation system that detects abuse pattern
 
 APIAbusePreventionUnit tracks live API traffic, emits structured request events, analyzes suspicious behavior, and lets operators apply mitigations such as response caching while the system is running. It demonstrates a practical abuse-prevention loop: observe traffic, detect risk, surface evidence, and respond without redeploying the API.
 
-**Hackathon portfolio project:** built to explore how API monitoring, abuse detection, and runtime mitigation can work together in a lightweight multi-service architecture.
-
 ## About
 
 APIAbusePreventionUnit is designed around a common production problem: APIs often fail silently under duplicate requests, retry storms, burst traffic, excessive polling, and expensive endpoint abuse until latency or infrastructure cost spikes.
@@ -64,8 +62,6 @@ Dashboard :3001
 - **Node.js**
 - **Express 5**
 - **TypeScript**
-- **Zod**
-- **Vitest**
 - **Next.js 16**
 - **React 19**
 - **SWR**
