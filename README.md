@@ -243,4 +243,4 @@ npm test
 
 ## License
 
-No open-source license is currently included.
+Distributed under the MIT License. See LICENSE.txt for more information.
