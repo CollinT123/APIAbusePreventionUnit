@@ -57,6 +57,15 @@ export function requestTracker(onEvent: (event: ApiEvent) => void) {
     res.setHeader("x-chain-depth", String(currentChainDepth + 1));
 
     res.on("finish", () => {
+      const path = (req.originalUrl ?? req.url ?? "").split("?")[0];
+      if (path.startsWith("/fixes")) {
+        return;
+      }
+
+      if (res.getHeader("x-cache-hit") === "true") {
+        return;
+      }
+
       const completedAt = new Date().toISOString();
       const latencyMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
       const route =

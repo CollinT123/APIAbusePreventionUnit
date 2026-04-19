@@ -24,6 +24,7 @@ export interface FixStatus {
 export class FixRegistry {
   private fixesById = new Map<string, FixConfig>();
   private fixIdByRoute = new Map<string, string>();
+  private archivedFixes: FixConfig[] = [];
 
   private routeMatches(pattern: string, path: string): boolean {
     const patternParts = pattern.split("/").filter(Boolean);
@@ -67,6 +68,10 @@ export class FixRegistry {
       return false;
     }
 
+    this.archivedFixes.unshift({
+      ...fix,
+      status: "disabled"
+    });
     this.fixesById.delete(fixId);
     this.fixIdByRoute.delete(fix.route);
 
@@ -95,6 +100,17 @@ export class FixRegistry {
 
   getAllFixes(): FixConfig[] {
     return Array.from(this.fixesById.values());
+  }
+
+  getFixHistoryForRoute(route: string): FixConfig[] {
+    const activeFixes = Array.from(this.fixesById.values()).filter(
+      (fix) => fix.route === route
+    );
+    const archivedFixes = this.archivedFixes.filter((fix) => fix.route === route);
+
+    return [...activeFixes, ...archivedFixes].sort(
+      (a, b) => parseIsoTimestampToMs(b.appliedAt) - parseIsoTimestampToMs(a.appliedAt)
+    );
   }
 
   getFixStatus(fixId: string, eventStore: EventStore): FixStatus | null {
