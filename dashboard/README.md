@@ -1,6 +1,6 @@
-# API Monitor Dashboard
+# API Abuse Prevention Dashboard
 
-A real-time dashboard for monitoring API abuse detection, viewing flagged issues, applying mitigations (fixes), and tracking their effectiveness. The dashboard connects to the APIMonitor backend services to display live metrics, grouped issue reports, and active fixes with before/after effectiveness data.
+A real-time dashboard for API abuse observability, flagged issue review, runtime mitigation, and fix effectiveness tracking. The dashboard connects to the APIMonitor backend services to display live metrics, grouped issue reports, active fixes, and route-level performance data.
 
 ## Prerequisites
 
