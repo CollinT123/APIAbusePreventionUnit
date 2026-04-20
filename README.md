@@ -1,12 +1,12 @@
-## APIAbusePreventionUnit
+# API Abuse Prevention Unit or APU
 
 A two-service API observability and mitigation system that detects abuse patterns and applies runtime fixes to reduce repeated load.
 
-APIAbusePreventionUnit tracks live API traffic, emits structured request events, analyzes suspicious behavior, and lets operators apply mitigations such as response caching while the system is running. It demonstrates a practical abuse-prevention loop: observe traffic, detect risk, surface evidence, and respond without redeploying the API.
+API Abuse Prevention Unit tracks live API traffic, emits structured request events, analyzes suspicious behavior, and lets operators apply mitigations such as response caching while the system is running. It demonstrates a practical abuse-prevention loop: observe traffic, detect risk, surface evidence, and respond without redeploying the API.
 
 ## About
 
-APIAbusePreventionUnit is designed around a common production problem: APIs often fail silently under duplicate requests, retry storms, burst traffic, excessive polling, and expensive endpoint abuse until latency or infrastructure cost spikes.
+API Abuse Prevention Unit is designed around a common production problem: APIs often fail silently under duplicate requests, retry storms, burst traffic, excessive polling, and expensive endpoint abuse until latency or infrastructure cost spikes.
 
 This project models that problem with a demo Express API, a separate analysis sink, and a Next.js dashboard. The API Server records completed requests and emits normalized telemetry. The Analysis Sink stores events in memory, runs rule-based detection against recent traffic history, and exposes summaries, flagged issues, route analytics, and fix state. Runtime fixes can then be applied back to the API Server, where middleware intercepts matching routes and applies mitigation behavior.
 
@@ -243,4 +243,4 @@ npm test
 
 ## License
 
-No open-source license is currently included.
+Distributed under the MIT License. See LICENSE.txt for more information.
